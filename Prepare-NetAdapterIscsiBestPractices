@@ -1,0 +1,47 @@
+
+
+$adapters = @()
+$adapters = get-netadapter -name ISCSI*
+
+foreach ($adapter in $adapters)
+{
+    #Unbind all protocols except for IPv4
+    set-netadapterbinding -name $adapter.name -componentID ms_server   -enabled $false 
+    set-netadapterbinding -name $adapter.name -componentID ms_implat   -enabled $false
+    set-netadapterbinding -name $adapter.name -componentID ms_msclient -enabled $false 
+    set-netadapterbinding -name $adapter.name -componentID ms_tcpip    -enabled $true 
+    set-netadapterbinding -name $adapter.name -componentID ms_lltdio   -enabled $false 
+    set-netadapterbinding -name $adapter.name -componentID vms_pp      -enabled $false
+    set-netadapterbinding -name $adapter.name -componentID ms_tcpip6   -enabled $false 
+    set-netadapterbinding -name $adapter.name -componentID ms_rspndr   -enabled $false 
+    set-netadapterbinding -name $adapter.name -componentID ms_pacer    -enabled $false 
+    #Change advanced NIC properties
+    Set-NetadapterAdvancedProperty -name $adapter.name -RegistryKeyword "*JumboPacket" -RegistryValue "9014"
+    Set-NetadapterAdvancedProperty -name $adapter.name -RegistryKeyword "*LsoV2IPv4" -RegistryValue "0"
+    Set-NetadapterAdvancedProperty -name $adapter.name -RegistryKeyword "*LsoV2IPv6" -RegistryValue "0"
+    Set-NetadapterAdvancedProperty -name $adapter.name -RegistryKeyword "*TCPChecksumOffloadIPv4" -RegistryValue "0"
+    Set-NetadapterAdvancedProperty -name $adapter.name -RegistryKeyword "*TCPChecksumOffloadIPv6" -RegistryValue "0"
+    Set-NetadapterAdvancedProperty -name $adapter.name -RegistryKeyword "*UDPChecksumOffloadIPv4" -RegistryValue "0"
+    Set-NetadapterAdvancedProperty -name $adapter.name -RegistryKeyword "*UDPChecksumOffloadIPv6" -RegistryValue "0"
+    Set-NetadapterAdvancedProperty -name $adapter.name -RegistryKeyword "*IPChecksumOffloadIPv4" -RegistryValue "0"
+    #Disable DNS Registration
+    Set-DnsClient -InterfaceAlias $adapter.name -ConnectionSpecificSuffix $null
+    Set-DnsClient -InterfaceAlias $adapter.name -RegisterThisConnectionsAddress $false
+    Set-DnsClient -InterfaceAlias $adapter.name -UseSuffixWhenRegistering $false
+    #Disable NetBIOS
+    $netbios = $null
+    $netbios = (Get-WmiObject -Class win32_networkadapterconfiguration | where {$_.index -eq $($adapter.interfaceindex)})
+    $netbios.SetTcpipNetbios(2)
+}
+#turn off the global offloads
+&Netsh.exe int tcp set global RSS=Disabled
+&Netsh.exe int tcp set global chimney=Disabled
+&Netsh.exe int tcp set global autotuninglevel=Disabled
+&Netsh.exe int tcp set global congestionprovider=None
+&Netsh.exe int tcp set global ecncapability=Disabled
+&Netsh.exe int ip set global taskoffload=disabled
+&Netsh.exe int tcp set global timestamps=Disabled
+&Netsh.exe int tcp set global netdma=disabled
+
+
+
