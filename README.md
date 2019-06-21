@@ -1,2 +1,2 @@
 # ISCSI
-Misc code for iSCSI setup
+Misc code examples for iSCSI setup through PowerShell
