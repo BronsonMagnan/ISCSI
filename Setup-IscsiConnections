@@ -1,0 +1,38 @@
+get-service MSiSCSI | Set-Service -StartupType Automatic
+get-service MSiSCSI | Start-Service
+get-service MSiSCSI | select name, status, starttype
+
+Get-NetFirewallServiceFilter -Service msiscsi | Enable-NetFirewallRule
+
+Get-NetFirewallServiceFilter -Service msiscsi | Get-NetFirewallRule | Select DisplayGroup,DisplayName,Enabled
+
+$IQN = Get-InitiatorPort | Select-Object -ExpandProperty nodeAddress
+
+$initiator1 = "172.30.89.45"
+$portallist1 = @(
+    "10.56.10.71",
+    "10.56.10.73",
+    "10.56.10.81",
+    "10.56.10.83"
+)
+$initiator2 = "172.30.88.45"
+$portallist2 = @(
+    "10.56.11.72",
+    "10.56.11.74",
+    "10.56.11.82",
+    "10.56.11.84"
+)
+#Create the Discovery portal entries for the target
+foreach ($targetPortal in $portallist1) {    New-IscsiTargetPortal -TargetPortalAddress $targetPortal -InitiatorPortalAddress $initiator1}
+foreach ($targetPortal in $portallist2) {    New-IscsiTargetPortal -TargetPortalAddress $targetPortal -InitiatorPortalAddress $initiator2}
+
+$nodeaddr = (Get-IscsiTarget).NodeAddress
+#Create the ISCSI Sessions
+foreach ($targetPortal in $portallist1) {    Connect-IscsiTarget -NodeAddress $nodeaddr -InitiatorPortalAddress $initiator1 -IsMultipathEnabled $true -IsPersistent $true -TargetPortalAddress $targetPortal}
+foreach ($targetPortal in $portallist2) {    Connect-IscsiTarget -NodeAddress $nodeaddr -InitiatorPortalAddress $initiator2 -IsMultipathEnabled $true -IsPersistent $true -TargetPortalAddress $targetPortal}
+
+#test the tcp connections
+$portallist1+$portallist2 | %{tnc -port 3260 -ComputerName $_ -InformationLevel Detailed}
+$portallist1+$portallist2 | %{Test-Connection -BufferSize 8KB -ComputerName $_}
+Write-Output "$IQN"
+
